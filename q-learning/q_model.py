@@ -10,7 +10,7 @@ from keras.optimizers import RMSprop, Adam
 def q_model():
     tsteps = 1
     batch_size = 1
-    num_features = 7
+    num_features = 2
 
     model = Sequential()
     model.add(LSTM(64,
@@ -28,9 +28,7 @@ def q_model():
     model.add(Dense(3, init='lecun_uniform'))
     model.add(Activation('linear'))  # linear output so we can have range of real-valued outputs
 
-    rms = RMSprop()
     adam = Adam()
     model.compile(loss='mse', optimizer=adam)
 
     return model
-

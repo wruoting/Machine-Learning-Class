@@ -1,5 +1,4 @@
 import plotly as py
-import cufflinks as cf
 from plotly.offline import init_notebook_mode
 import plotly.graph_objs as go
 import pandas
