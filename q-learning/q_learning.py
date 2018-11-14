@@ -79,7 +79,7 @@ def q_learning():
                     if new_state_index <= batches:
                         x_train.append(state[new_state_index])
                         y_train.append(y)
-                        
+
                 model.fit(x_train, y_train, batch_size=batch_size, epochs=1, verbose=0)
                 state = state[new_state_index]
             if terminal_state == True:  # if reached terminal state, update epoch status
