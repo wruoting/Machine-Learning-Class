@@ -80,13 +80,13 @@ def q_learning():
                         x_train.append(state[new_state_index])
                         y_train.append(y.reshape(1,1,3))
 
-                for (x,y) in zip(x_train, y_train):
+                for (x, y) in zip(x_train, y_train):
                     model.fit(x, y, batch_size=1, epochs=1)
                 state = state[new_state_index]
-            if terminal_state == True:  # if reached terminal state, update epoch status
+            if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
     # reset time step to evaluate the total reward
-    eval_reward = evaluate_q_epoch(state, price_data, model, decision_state, batch_range)
+    eval_reward = evaluate_q_epoch(state, price_data, model, decision_state)
     learning_progress.append(price_data)
 
 
@@ -117,11 +117,11 @@ def softmax(q_values, state_index, total_steps):
     except Exception as e:
         print("Catching a ", e)
         print("Refactoring to choose the largest q value")
-        max = 0
+        maximum = 0
         final_index = 0
         for index, value in enumerate(q_values):
-            if value > max:
-                max = value
+            if value > maximum:
+                maximum = value
                 final_index = index
 
         q_value_softmax = [1 if index == final_index else 0 for index,value in enumerate(q_values)]
@@ -176,23 +176,24 @@ def get_reward(state, state_index, action, data, decision_state, terminal_state)
     }
     return action_to_reward[action]
 
-def evaluate_q_epoch(state, price_data, model, decision_state, batch_range):
-    total_state = pd.Series(index=np.arange(len(price_data)))
+
+def evaluate_q_epoch(state, price_data, model, decision_state):
     eval_reward = 0
     terminal_state = False
-    batch_length = len(batch_range)
     state_index = 0
     max_length = len(state)
-    while terminal_state == False:
+    while not terminal_state:
         q_value = model.predict(state[state_index], batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
         state_index, decision_state, terminal_state = take_action(price_data, action, decision_state, state, state_index)
         eval_reward += get_reward(state, state_index, action, price_data, decision_state, terminal_state)
         if state_index < max_length:
-            state_index+=1
+            state_index += 1
         else:
             terminal_state = True
     return eval_reward
 
+
 q_learning()
+
