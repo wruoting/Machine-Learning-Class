@@ -42,7 +42,6 @@ def q_learning():
             q_value = model.predict(state[state_index], batch_size=batch_size)
             q_value = q_value[0][0]
 
-            #TODO: we are returning 5 not 6 sets
             # Softmax it
             q_value_list, softmax_percentages = softmax(q_value, state_index, len(price_data))
             action = int(np.random.choice(3, 1, p=softmax_percentages))
@@ -57,33 +56,31 @@ def q_learning():
             if len(replay) < stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
-                replay[0] = (state, action, reward, state_index)
-                print(len(replay))
-                print(batch_size)
-                mini_batch = random.sample(replay, batch_size)
+                batches = len(state)-1
+                mini_batch = random.sample(replay, batches)
                 x_train = []
                 y_train = []
                 for batch in mini_batch:
                     # Get max_Q(S',a)
                     state, action, reward, new_state_index = batch
-                    old_q_val = model.predict(state[new_state_index], batch_size=batch_size)
-                    new_q_val = model.predict(state[new_state_index+1], batch_size=batch_size)
-                    max_q = np.max(new_q_val)
-                    y = np.zeros((1, 3))
-                    y[:] = old_q_val[:]
-                    if terminal_state == 0:  # non-terminal state
+                    if new_state_index < batches:
+                        old_q_val = model.predict(state[new_state_index], batch_size=batch_size)
+                        new_q_val = model.predict(state[new_state_index+1], batch_size=batch_size)
+                        max_q = np.max(new_q_val)
+                        y = np.zeros((1, 3))
+                        y = old_q_val[0][0]
                         update = (reward + (gamma * max_q))
-                    else:  # terminal state
-                        update = reward
-                    y[0][action] = update
-
-                    # print(time_step, reward, terminal_state)
-                    x_train.append(state[new_state_index])
-                    y_train.append(y.reshape(3, ))
-
-                x_train = np.squeeze(np.array(x_train), axis=1)
-                y_train = np.array(y_train)
-                model.fit(x_train, y_train, batch_size=batch_size, nb_epoch=1, verbose=0)
+                        y[action] = update
+                    elif new_state_index == batches:
+                        q_val = model.predict(state[new_state_index], batch_size=batch_size)
+                        max_q = np.max(q_val)
+                        y = q_val[0][0]
+                        y[action] = max_q
+                    if new_state_index <= batches:
+                        x_train.append(state[new_state_index])
+                        y_train.append(y)
+                        
+                model.fit(x_train, y_train, batch_size=batch_size, epochs=1, verbose=0)
                 state = state[new_state_index]
             if terminal_state == True:  # if reached terminal state, update epoch status
                 status = 0
@@ -173,11 +170,10 @@ def get_reward(state, state_index, action, data, decision_state, terminal_state)
     sell_reward = data[past_index] - data[current_index]
     action_to_reward = {
         0:hold_reward,
-        1:buy_reward,
-        2:sell_reward
+        1:buy_reward[1],
+        2:sell_reward[1]
     }
-
-    return action_to_reward[reward]
+    return action_to_reward[action]
 
 def evaluate_q_epoch(state, price_data, model, decision_state):
     total_state = pd.Series(index=np.arange(len(price_data)))
