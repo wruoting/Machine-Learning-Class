@@ -78,14 +78,15 @@ def q_learning():
                         y[action] = max_q
                     if new_state_index <= batches:
                         x_train.append(state[new_state_index])
-                        y_train.append(y)
+                        y_train.append(y.reshape(1,1,3))
 
-                model.fit(x_train, y_train, batch_size=batch_size, epochs=1, verbose=0)
+                for (x,y) in zip(x_train, y_train):
+                    model.fit(x, y, batch_size=1, epochs=1)
                 state = state[new_state_index]
             if terminal_state == True:  # if reached terminal state, update epoch status
                 status = 0
     # reset time step to evaluate the total reward
-    eval_reward = evaluate_q_epoch(state, price_data, model, decision_state)
+    eval_reward = evaluate_q_epoch(state, price_data, model, decision_state, batch_range)
     learning_progress.append(price_data)
 
 
@@ -175,7 +176,7 @@ def get_reward(state, state_index, action, data, decision_state, terminal_state)
     }
     return action_to_reward[action]
 
-def evaluate_q_epoch(state, price_data, model, decision_state):
+def evaluate_q_epoch(state, price_data, model, decision_state, batch_range):
     total_state = pd.Series(index=np.arange(len(price_data)))
     eval_reward = 0
     terminal_state = False
@@ -185,17 +186,13 @@ def evaluate_q_epoch(state, price_data, model, decision_state):
     while terminal_state == False:
         q_value = model.predict(state[state_index], batch_size=1)
         q_value = q_value[0][0]
-        print('eval stage')
         action = np.argmax(q_value)
         state_index, decision_state, terminal_state = take_action(price_data, action, decision_state, state, state_index)
-        print(state_index, decision_state, terminal_state)
         eval_reward += get_reward(state, state_index, action, price_data, decision_state, terminal_state)
         if state_index < max_length:
             state_index+=1
         else:
             terminal_state = True
-
-    print(eval_reward)
     return eval_reward
 
 q_learning()
