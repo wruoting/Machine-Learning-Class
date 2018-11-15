@@ -41,6 +41,8 @@ def q_learning():
             # Run the Q function on S and get the predicted value on Q
             q_value = model.predict(state[state_index], batch_size=batch_size)
             q_value = q_value[0][0]
+            print("predict")
+            print(q_value)
 
             # Softmax it
             q_value_list, softmax_percentages = softmax(q_value, state_index, len(price_data))
@@ -57,7 +59,10 @@ def q_learning():
                 replay.append((state, action, reward, state_index))
             else:
                 batches = len(state)-1
-                mini_batch = random.sample(replay, batches)
+                if batches < stored_buffer:
+                    mini_batch = random.sample(replay, batches)
+                elif batches > stored_buffer:
+                    mini_batch = random.sample(replay, stored_buffer)
                 x_train = []
                 y_train = []
                 for batch in mini_batch:
@@ -180,11 +185,11 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range):
     total_state = pd.Series(index=np.arange(len(price_data)))
     eval_reward = 0
     terminal_state = False
-    batch_length = len(batch_range)
     state_index = 0
     max_length = len(state)
     while terminal_state == False:
-        q_value = model.predict(state[state_index], batch_size=1)
+        reshaped_data = np.reshape(state[state_index],(1,1,np.multiply(len(batch_range),2)))
+        q_value = model.predict(reshaped_data, batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
         state_index, decision_state, terminal_state = take_action(price_data, action, decision_state, state, state_index)
