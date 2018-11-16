@@ -47,20 +47,19 @@ def q_learning():
             action = int(np.random.choice(3, 1, p=softmax_percentages))
 
             # take action and return new state
-            state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index)
+            state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer)
             # observe reward
             reward = get_reward(state, state_index, action, price_data, decision_state)
-
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
-            if len(replay) < stored_buffer and not terminal_state:
+            if len(replay) <= stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
                 batches = len(state)-1
-                if batches < stored_buffer:
+                if batches < len(replay):
                     mini_batch = random.sample(replay, batches)
-                elif batches > stored_buffer:
-                    mini_batch = random.sample(replay, stored_buffer)
+                elif batches > len(replay):
+                    mini_batch = random.sample(replay, len(replay))
                 x_train = []
                 y_train = []
                 for batch in mini_batch:
@@ -70,7 +69,6 @@ def q_learning():
                         old_q_val = model.predict(state[new_state_index], batch_size=batch_size)
                         new_q_val = model.predict(state[new_state_index+1], batch_size=batch_size)
                         max_q = np.max(new_q_val)
-                        y = np.zeros((1, 3))
                         y = old_q_val[0][0]
                         update = (reward + (gamma * max_q))
                         y[action] = update
@@ -89,7 +87,9 @@ def q_learning():
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
     # reset time step to evaluate the total reward
-    eval_reward = evaluate_q_epoch(state, price_data, model, decision_state, batch_range)
+    eval_reward, decision_state = evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer)
+    print(eval_reward)
+    print(decision_state)
     learning_progress.append(price_data)
 
 
@@ -144,16 +144,15 @@ def softmax(q_values, state_index, total_steps):
     return q_value_list, adjusted_q_value_softmax
 
 
-def take_action(action, decision_state, state, state_index):
+def take_action(action, decision_state, state, state_index, stored_buffer):
     terminal_state = False
     # if the current state is the last point in the frame
-    max_length = len(state)
+    max_length = len(state) if len(state) <= stored_buffer else stored_buffer
     time_step_length = len(state[0])
     state_index += 1
     if state_index >= max_length:
         terminal_state = True
-        print(state_index)
-        return state_index-1, decision_state, terminal_state
+        return state_index, decision_state, terminal_state
 
     #take action
     if action == 1: #buy
@@ -182,7 +181,7 @@ def get_reward(state, state_index, action, data, decision_state):
     return action_to_reward[action]
 
 
-def evaluate_q_epoch(state, price_data, model, decision_state, batch_range):
+def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer):
     eval_reward = 0
     terminal_state = False
     state_index = 0
@@ -192,13 +191,13 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range):
         q_value = model.predict(reshaped_data, batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
-        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index)
+        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer)
         eval_reward += get_reward(state, state_index, action, price_data, decision_state)
         if state_index < max_length:
             state_index += 1
         else:
             terminal_state = True
-    return eval_reward
+    return eval_reward, decision_state
 
 
 q_learning()
