@@ -27,7 +27,7 @@ def q_learning():
         # 3     NaN
 
     stored_buffer = 50
-    epochs = 100
+    epochs = 50
     gamma = 0.9  # discount factor, we are rewarding long term trading with this high factor
     status = 1
     terminal_state = False
@@ -47,7 +47,7 @@ def q_learning():
             action = int(np.random.choice(3, 1, p=softmax_percentages))
 
             # take action and return new state
-            state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer)
+            state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
             # observe reward
             reward = get_reward(state, state_index, action, price_data, decision_state)
             # Store states if less than our buffer
@@ -82,19 +82,26 @@ def q_learning():
                         y_train.append(y.reshape(1,1,3))
 
                 for (x, y) in zip(x_train, y_train):
-                    model.fit(x, y, batch_size=1, epochs=1)
-                state = state[new_state_index]
+                    model.fit(x, y, batch_size=1, epochs=1, verbose=0)
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
+        status = 1
+        state_index = 0
+        terminal_state = False
+        replay = []
     # reset time step to evaluate the total reward
     eval_reward, decision_state = evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer)
     print(eval_reward)
-    print(decision_state)
+
     learning_progress.append(price_data)
 
-
     # Init all states and actions
-    # graph([df_bullish,df_test],'Plots.html')
+    decision_state_dataframe = pd.DataFrame([df_bullish['Time'],decision_state])
+    color_set = ['#00008B','#008000']
+    mode_set = ['lines+markers','markers']
+
+    print(decision_state_dataframe)
+    graph([df_bullish,decision_state_dataframe],color_set,mode_set,'Plots.html')
 
 
 # we're not going to use an anneal value because this is just a proportion of q values
@@ -118,8 +125,6 @@ def softmax(q_values, state_index, total_steps):
             q_value_softmax.append(np.divide(numerator,sum_exponent))
             q_value_list.append(value)
     except Exception as e:
-        print("Catching a ", e)
-        print("Refactoring to choose the largest q value")
         maximum = 0
         final_index = 0
         for index, value in enumerate(q_values):
@@ -144,11 +149,11 @@ def softmax(q_values, state_index, total_steps):
     return q_value_list, adjusted_q_value_softmax
 
 
-def take_action(action, decision_state, state, state_index, stored_buffer):
+def take_action(action, decision_state, state, state_index, stored_buffer, batch_range):
     terminal_state = False
     # if the current state is the last point in the frame
     max_length = len(state) if len(state) <= stored_buffer else stored_buffer
-    time_step_length = len(state[0])
+    time_step_length = len(batch_range)
     state_index += 1
     if state_index >= max_length:
         terminal_state = True
@@ -191,7 +196,7 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stor
         q_value = model.predict(reshaped_data, batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
-        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer)
+        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
         eval_reward += get_reward(state, state_index, action, price_data, decision_state)
         if state_index < max_length:
             state_index += 1
