@@ -5,19 +5,23 @@ import pandas
 py.offline.init_notebook_mode(connected=True)
 
 
-def graph(dataframe_set, name):
+def graph(dataframe_set, color_set, mode_set, name):
     data = []
     x_axis_label = ''
     y_axis_label = ''
-    for dataframe in dataframe_set:
+    for dataframe, color, mode in zip(dataframe_set, color_set, mode_set):
         x_axis_label = dataframe.columns[0]
         y_axis_label = dataframe.columns[1]
         data.append(
             go.Scatter(
                 x=dataframe[x_axis_label],
                 y=dataframe[y_axis_label],
-                mode='markers',
-                name=name
+                mode= mode,
+                name=name,
+                marker = dict(
+                    color = color,
+                    line = dict(width = 1)
+                )
             )
         )
 

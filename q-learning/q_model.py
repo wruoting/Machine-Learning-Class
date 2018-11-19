@@ -8,10 +8,17 @@ from keras.optimizers import RMSprop, Adam
 
 def q_model():
     model = Sequential()
+    # Input layer
     model.add(Dense(1))
+
+    
     model.add(Activation('relu'))
-    model.add(Dense(3))
+    model.add(Dense(5))
     model.add(Activation('sigmoid'))
+    model.add(Dense(5))
+    model.add(Activation('relu'))
+
+    # Output layer
     model.add(Dense(3, activation='linear'))
 
     adam = Adam()
