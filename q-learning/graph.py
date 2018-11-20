@@ -4,6 +4,13 @@ import plotly.graph_objs as go
 import pandas
 py.offline.init_notebook_mode(connected=True)
 
+def map_to_graph(dataframe_color, color_set):
+    for index, row in dataframe_color.iterrows():
+        if row[1] == 1:
+            pass
+        elif row[1] == -1:
+            pass
+
 
 def graph(dataframe_set, color_set, mode_set, name):
     data = []
