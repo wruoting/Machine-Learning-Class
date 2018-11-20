@@ -1,6 +1,6 @@
 import tensorflow as tf
 from csv_to_dataframe import csv_to_dataframe
-from graph import graph
+from graph import graph, map_to_graph
 import numpy as np
 import pandas as pd
 from preprocessing import processing_data
@@ -96,12 +96,14 @@ def q_learning():
     learning_progress.append(price_data)
 
     # Init all states and actions
-    decision_state_dataframe = pd.DataFrame([df_bullish['Time'],decision_state])
+
+    decision_state_dataframe = pd.DataFrame(np.transpose([df_bullish['Time'],decision_state]))
+
     color_set = ['#00008B','#008000']
     mode_set = ['lines+markers','markers']
+    map_to_graph(decision_state_dataframe, color_set)
 
-    print(decision_state_dataframe)
-    graph([df_bullish,decision_state_dataframe],color_set,mode_set,'Plots.html')
+    #graph([df_bullish,decision_state_dataframe],color_set,mode_set,'Plots.html')
 
 
 # we're not going to use an anneal value because this is just a proportion of q values
