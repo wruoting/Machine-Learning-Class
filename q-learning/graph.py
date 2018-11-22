@@ -5,30 +5,35 @@ import pandas
 py.offline.init_notebook_mode(connected=True)
 
 def map_to_graph(dataframe_color, color_set):
+    color_to_map = []
     for index, row in dataframe_color.iterrows():
         if row[1] == 1:
-            pass
+            # green
+            color_to_map.append(color_set[0])
         elif row[1] == -1:
-            pass
+            # red
+            color_to_map.append([int(row[0]), color_set[1]])
+    return color_to_map
 
-
-def graph(dataframe_set, color_set, mode_set, name):
+def graph(dataframe_set, color_scale, mode_set, name):
     data = []
     x_axis_label = ''
     y_axis_label = ''
-    for dataframe, color, mode in zip(dataframe_set, color_set, mode_set):
+    for dataframe, mode in zip(dataframe_set, mode_set):
         x_axis_label = dataframe.columns[0]
         y_axis_label = dataframe.columns[1]
         data.append(
             go.Scatter(
                 x=dataframe[x_axis_label],
                 y=dataframe[y_axis_label],
-                mode= mode,
+                mode=mode,
                 name=name,
                 marker = dict(
-                    color = color,
-                    line = dict(width = 1)
+                    size=1,
+                    color = color_scale,
+                    showscale=False
                 )
+
             )
         )
 

@@ -52,6 +52,7 @@ def q_learning():
             reward = get_reward(state, state_index, action, price_data, decision_state)
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
+            # this only does 50 swaths, oops
             if len(replay) <= stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
@@ -99,11 +100,11 @@ def q_learning():
 
     decision_state_dataframe = pd.DataFrame(np.transpose([df_bullish['Time'],decision_state]))
 
-    color_set = ['#00008B','#008000']
-    mode_set = ['lines+markers','markers']
-    map_to_graph(decision_state_dataframe, color_set)
+    color_set = ['rgb(0,128,0)','rgb(255,0,0)']
+    mode_set = ['lines+markers']
+    color_scale = map_to_graph(decision_state_dataframe, color_set)
 
-    #graph([df_bullish,decision_state_dataframe],color_set,mode_set,'Plots.html')
+    graph([df_bullish],color_scale,mode_set,'Plots.html')
 
 
 # we're not going to use an anneal value because this is just a proportion of q values
