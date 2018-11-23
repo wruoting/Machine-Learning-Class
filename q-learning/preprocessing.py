@@ -4,10 +4,7 @@ import pandas as pd
 
 # we assume data is distributed normally
 def processing_data(data, batch_range):
-    # Normalization
-    # https://datascience.stackexchange.com/questions/12321/difference-between-fit-and-fit-transform-in-scikit-learn-models
-    scaler = preprocessing.StandardScaler()
-    data = data.astype(str).astype(int)
+    data = data.astype(str).astype(float)
     price_data = data.get('Price')
     time_data = data.get('Time')
     price_diff = np.diff(price_data.values)
@@ -19,7 +16,6 @@ def processing_data(data, batch_range):
     xdata = np.column_stack((time_data, price_diff))
     xdata = np.nan_to_num(xdata)
 
-    xdata = scaler.fit_transform(xdata)
     state = []
     # slice into states
     num_of_slices = int(np.divide((len(xdata)-len(xdata)%batch_size),batch_size))

@@ -4,13 +4,13 @@ from graph import graph, map_to_graph
 import numpy as np
 import pandas as pd
 from preprocessing import processing_data
+from keras.models import load_model
 from q_model import q_model
 import random
 
 
 def q_learning():
     df_bullish = csv_to_dataframe('bullish-test.csv')
-    df_test = csv_to_dataframe('overlay-test.csv')
     model = q_model()
     batch_range = range(0,15)
     state, price_data = processing_data(df_bullish,batch_range)
@@ -49,10 +49,9 @@ def q_learning():
             # take action and return new state
             state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
             # observe reward
-            reward = get_reward(state, state_index, action, price_data, decision_state)
+            reward = get_reward(state, state_index, action, price_data, decision_state, batch_size)
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
-            # this only does 50 swaths, oops
             if len(replay) <= stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
@@ -86,25 +85,11 @@ def q_learning():
                     model.fit(x, y, batch_size=1, epochs=1, verbose=0)
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
-        status = 1
-        state_index = 0
-        terminal_state = False
+        # Pick a random index to start from
+        state_index = np.random.randint(0,len(state)-1,size=1)
         replay = []
-    # reset time step to evaluate the total reward
-    eval_reward, decision_state = evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer)
-    print(eval_reward)
-
-    learning_progress.append(price_data)
-
-    # Init all states and actions
-
-    decision_state_dataframe = pd.DataFrame(np.transpose([df_bullish['Time'],decision_state]))
-
-    color_set = ['rgb(0,128,0)','rgb(255,0,0)']
-    mode_set = ['lines+markers']
-    color_scale = map_to_graph(decision_state_dataframe, color_set)
-
-    graph([df_bullish],color_scale,mode_set,'Plots.html')
+    # save your model
+    model.save('q_model.h5')
 
 
 # we're not going to use an anneal value because this is just a proportion of q values
@@ -152,10 +137,13 @@ def softmax(q_values, state_index, total_steps):
     return q_value_list, adjusted_q_value_softmax
 
 
-def take_action(action, decision_state, state, state_index, stored_buffer, batch_range):
+def take_action(action, decision_state, state, state_index, stored_buffer, batch_range, eval=False):
     terminal_state = False
     # if the current state is the last point in the frame
-    max_length = len(state) if len(state) <= stored_buffer else stored_buffer
+    if eval:
+        max_length = len(state)
+    else:
+        max_length = len(state) if len(state) <= stored_buffer else stored_buffer
     time_step_length = len(batch_range)
     state_index += 1
     if state_index >= max_length:
@@ -173,18 +161,21 @@ def take_action(action, decision_state, state, state_index, stored_buffer, batch
     return state_index, decision_state, terminal_state
 
 
-def get_reward(state, state_index, action, data, decision_state):
+def get_reward(state, state_index, action, data, decision_state, batch_size):
     decision_state.fillna(value=0,inplace=True)
-    time_step_length = len(state[0])
+    time_step_length = batch_size
     current_index = np.multiply(time_step_length, state_index)
     past_index = np.multiply(time_step_length, state_index-1)
-    buy_reward = data[current_index] - data[past_index]
+    total_gains = 0
+    for index in range(past_index, current_index):
+        total_gains += data[index][1]
+    buy_reward = total_gains
     hold_reward = 0
-    sell_reward = data[past_index] - data[current_index]
+    sell_reward = np.multiply(total_gains,-1)
     action_to_reward = {
         0: hold_reward,
-        1: buy_reward[1],
-        2: sell_reward[1]
+        1: buy_reward,
+        2: sell_reward
     }
     return action_to_reward[action]
 
@@ -194,14 +185,15 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stor
     terminal_state = False
     state_index = 0
     max_length = len(state)
+    batch_size = len(batch_range)
     while not terminal_state:
         reshaped_data = np.reshape(state[state_index],(1,1,np.multiply(len(batch_range),2)))
         q_value = model.predict(reshaped_data, batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
-        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
-        eval_reward += get_reward(state, state_index, action, price_data, decision_state)
-        if state_index < max_length:
+        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range, eval=True)
+        eval_reward += get_reward(state, state_index, action, price_data, decision_state, batch_size)
+        if state_index < max_length - 1:
             state_index += 1
         else:
             terminal_state = True
