@@ -10,10 +10,10 @@ import random
 
 
 def q_learning():
-    df_bullish = csv_to_dataframe('bullish-test.csv')
+    df_data = csv_to_dataframe('sin-test.csv')
     model = q_model()
     batch_range = range(0,15)
-    state, price_data = processing_data(df_bullish,batch_range)
+    state, price_data = processing_data(df_data,batch_range)
         # Output:[[ Price Time ]]
         # State: [[ 1 2 ]]
         # Data: [[ 1 2 ]]
@@ -56,7 +56,8 @@ def q_learning():
                 replay.append((state, action, reward, state_index))
             else:
                 batches = len(state)-1
-                if batches < len(replay):
+                mini_batch = []
+                if batches <= len(replay):
                     mini_batch = random.sample(replay, batches)
                 elif batches > len(replay):
                     mini_batch = random.sample(replay, len(replay))
@@ -83,10 +84,13 @@ def q_learning():
 
                 for (x, y) in zip(x_train, y_train):
                     model.fit(x, y, batch_size=1, epochs=1, verbose=0)
+                    loss, mse = model.evaluate(x, y, verbose=0)
+
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
         # Pick a random index to start from
-        state_index = np.random.randint(0,len(state)-1,size=1)
+        state_index = np.random.randint(0,len(state)-1,size=1)[0]
+        status = 1
         replay = []
     # save your model
     model.save('q_model.h5')
@@ -198,6 +202,5 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stor
         else:
             terminal_state = True
     return eval_reward, decision_state
-
 
 q_learning()
