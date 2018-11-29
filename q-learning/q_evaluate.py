@@ -13,9 +13,9 @@ def q_evaluate():
     df_bullish = csv_to_dataframe('sin-test.csv')
     plot_name = 'Sine.html'
     model = load_model('q_model.h5')
-    stored_buffer = 50
-    batch_range = range(0,15)
-    state, price_data = processing_data(df_bullish,batch_range)
+    stored_buffer = 100
+    batch_range = range(0, 15)
+    state, price_data = processing_data(df_bullish, batch_range)
     decision_state = pd.Series(index=np.arange(len(price_data)))
     eval_reward, decision_state = evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer)
     print("Reward:" + str(eval_reward))
@@ -26,4 +26,4 @@ def q_evaluate():
     buy_to_map, sell_to_map = map_to_graph(decision_state_dataframe, df_bullish, color_set)
     graph([df_bullish], [buy_to_map], [sell_to_map], plot_name)
 
-q_evaluate();
+q_evaluate()
