@@ -9,11 +9,10 @@ from q_model import q_model
 import random
 
 
-def q_learning():
+def q_learning(model=None):
     df_data = csv_to_dataframe('sin-test.csv')
-    model = q_model()
-    batch_range = range(0,15)
-    state, price_data = processing_data(df_data,batch_range)
+    batch_range = range(0, 15)
+    state, price_data = processing_data(df_data, batch_range)
         # Output:[[ Price Time ]]
         # State: [[ 1 2 ]]
         # Data: [[ 1 2 ]]
@@ -27,7 +26,7 @@ def q_learning():
         # 3     NaN
 
     stored_buffer = 50
-    epochs = 50
+    epochs = 300
     gamma = 0.9  # discount factor, we are rewarding long term trading with this high factor
     status = 1
     terminal_state = False
@@ -35,7 +34,9 @@ def q_learning():
     batch_size = len(batch_range)
     replay = []
     state_index = 0
+    loss_matrix = []
     for epoch in range(epochs):
+        print('next')
         while status == 1:
             # We start in state S
             # Run the Q function on S and get the predicted value on Q
@@ -43,7 +44,7 @@ def q_learning():
             q_value = q_value[0][0]
 
             # Softmax it
-            q_value_list, softmax_percentages = softmax(q_value, state_index, len(price_data))
+            q_value_list, softmax_percentages = softmax(q_value, state_index, len(state))
             action = int(np.random.choice(3, 1, p=softmax_percentages))
 
             # take action and return new state
@@ -70,9 +71,13 @@ def q_learning():
                         old_q_val = model.predict(state[new_state_index], batch_size=batch_size)
                         new_q_val = model.predict(state[new_state_index+1], batch_size=batch_size)
                         max_q = np.max(new_q_val)
+                        print('hi')
+                        print(action)
+                        print(old_q_val)
                         y = old_q_val[0][0]
-                        update = (reward + (gamma * max_q))
-                        y[action] = update
+                        update = reward + gamma * max_q - y[action]
+                        y[action] += update
+                        print(y)
                     elif new_state_index == batches:
                         q_val = model.predict(state[new_state_index], batch_size=batch_size)
                         max_q = np.max(q_val)
@@ -80,20 +85,22 @@ def q_learning():
                         y[action] = max_q
                     if new_state_index <= batches:
                         x_train.append(state[new_state_index])
-                        y_train.append(y.reshape(1,1,3))
+                        y_train.append(y.reshape(1, 1, 3))
 
                 for (x, y) in zip(x_train, y_train):
                     model.fit(x, y, batch_size=1, epochs=1, verbose=0)
                     loss, mse = model.evaluate(x, y, verbose=0)
+                    loss_matrix.append(loss)
 
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
         # Pick a random index to start from
-        state_index = np.random.randint(0,len(state)-1,size=1)[0]
+        state_index = np.random.randint(0,len(state)-1, size=1)[0]
         status = 1
         replay = []
     # save your model
     model.save('q_model.h5')
+    return loss_matrix
 
 
 # we're not going to use an anneal value because this is just a proportion of q values
@@ -153,29 +160,29 @@ def take_action(action, decision_state, state, state_index, stored_buffer, batch
     if state_index >= max_length:
         terminal_state = True
         return state_index, decision_state, terminal_state
-
+    decision_state_index = state_index + time_step_length
     #take action
     if action == 1: #buy
-        decision_state.loc[np.multiply(time_step_length, state_index)] = 1
+        decision_state.loc[decision_state_index] = 1
     elif action == 2: #sell
-        decision_state.loc[np.multiply(time_step_length, state_index)] = -1
+        decision_state.loc[decision_state_index] = -1
     else: #hold
-        decision_state.loc[np.multiply(time_step_length, state_index)] = 0
+        decision_state.loc[decision_state_index] = 0
 
     return state_index, decision_state, terminal_state
 
 
 def get_reward(state, state_index, action, data, decision_state, batch_size):
-    decision_state.fillna(value=0,inplace=True)
+    decision_state.fillna(value=0, inplace=True)
     time_step_length = batch_size
-    current_index = np.multiply(time_step_length, state_index)
-    past_index = np.multiply(time_step_length, state_index-1)
+    current_index = state_index + time_step_length
+    past_index = state_index + time_step_length-1
     total_gains = 0
     for index in range(past_index, current_index):
         total_gains += data[index][1]
     buy_reward = total_gains
     hold_reward = 0
-    sell_reward = np.multiply(total_gains,-1)
+    sell_reward = np.multiply(total_gains, -1)
     action_to_reward = {
         0: hold_reward,
         1: buy_reward,
@@ -195,6 +202,7 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stor
         q_value = model.predict(reshaped_data, batch_size=1)
         q_value = q_value[0][0]
         action = np.argmax(q_value)
+        print(action)
         state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range, eval=True)
         eval_reward += get_reward(state, state_index, action, price_data, decision_state, batch_size)
         if state_index < max_length - 1:
@@ -203,4 +211,5 @@ def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stor
             terminal_state = True
     return eval_reward, decision_state
 
-q_learning()
+
+q_learning(model=q_model())
