@@ -25,9 +25,9 @@ def q_learning(model=None):
         # 2     NaN
         # 3     NaN
 
-    stored_buffer = 1
-    epochs = 1
-    gamma = 0.9  # discount factor, we are rewarding long term trading with this high factor
+    stored_buffer = 500
+    epochs = 10
+    gamma = 0.7  # discount factor, we are rewarding long term trading with this high factor
     learning_rate = 0.05
     status = 1
     terminal_state = False
@@ -58,10 +58,13 @@ def q_learning(model=None):
 
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
-            CURRENTLY IT ONLY SAMPLES FROM THE FIRST X NUMBERS!!
             if len(replay) <= stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
+                if not terminal_state:
+                    replay.pop(0)
+                    replay.append((state, action, reward, state_index))
+                    # we havent ended but we will replace a random one
                 batches = len(state)-1
                 mini_batch = []
                 if batches <= len(replay):
@@ -88,6 +91,7 @@ def q_learning(model=None):
                         update = learning_rate * (reward + gamma * max_q - y[action])
                         print(update)
                         y[action] += update
+                        print(y)
                     elif new_state_index == batches:
                         q_val = model.predict(state[new_state_index], batch_size=batch_size)
                         max_q = np.max(q_val)
@@ -215,7 +219,6 @@ def get_reward(portfolio_exposure, state_index, action, data, decision_state, ba
         1: buy_reward,
         2: sell_reward
     }
-    #print(action_to_reward)
     return portfolio_exposure, action_to_reward[action]
 
 
