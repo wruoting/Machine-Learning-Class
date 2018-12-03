@@ -15,7 +15,7 @@ def q_model():
     model.add(Activation('sigmoid'))
     model.add(Dense(64))
     model.add(Dropout(0.15))
-    model.add(Activation('sigmoid'))
+    model.add(Activation('relu'))
     model.add(Dropout(0.1))
     model.add(Dense(64))
     model.add(Activation('sigmoid'))

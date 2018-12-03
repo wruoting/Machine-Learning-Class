@@ -28,4 +28,4 @@ def processing_data(data, batch_range):
         # Squeezing a range of data pairs into one dimension to output as one batch
         reshaped_data = np.reshape(scaled_data[index:next_index, 0:2], (1, 1, np.multiply(len(batch_range), 2)))
         state.append(reshaped_data)
-    return state, unscaled_data
+    return state, scaled_data, unscaled_data
