@@ -10,8 +10,8 @@ import random
 
 
 def q_learning(model=None):
-    df_data = csv_to_dataframe('sin-real.csv')
-    model_name = 'q_model_sine.h5'
+    df_data = csv_to_dataframe('btc-train.csv')
+    model_name = 'q_model_btc_train_0.07_learning.h5'
     batch_range = range(0, 15)
     state, price_data, unscaled_price_data = processing_data(df_data, batch_range)
         # Output:[[ Price Time ]]
@@ -26,10 +26,10 @@ def q_learning(model=None):
         # 2     NaN
         # 3     NaN
 
-    stored_buffer = np.multiply(0.75, len(price_data))
+    stored_buffer = np.multiply(0.80, len(price_data))
     epochs = 20
     gamma = 0.9  # discount factor, we are rewarding long term trading with this high factor
-    learning_rate = 0.1
+    learning_rate = 0.08
     status = 1
     terminal_state = False
     batch_size = len(batch_range)
@@ -52,7 +52,7 @@ def q_learning(model=None):
             state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
             print(state_index)
             # observe reward
-            reward = get_reward(state_index, action, price_data, decision_state, batch_size)
+            reward = get_reward(state_index, action, price_data, unscaled_price_data, decision_state, batch_size)
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
             if len(replay) < stored_buffer and not terminal_state:
@@ -168,7 +168,7 @@ def take_action(action, decision_state, state, state_index, stored_buffer, batch
     return state_index, decision_state, terminal_state
 
 
-def get_reward(state_index, action, data, decision_state, batch_size, eval=False):
+def get_reward(state_index, action, data, unscaled_data, decision_state, batch_size, eval=False):
     decision_state.fillna(value=0, inplace=True)
     time_step_length = batch_size
     current_index = state_index + time_step_length
@@ -176,7 +176,10 @@ def get_reward(state_index, action, data, decision_state, batch_size, eval=False
     total_gains = 0
 
     for index in range(past_index, current_index):
-        total_gains += data[index][1]
+        if eval:
+            total_gains += unscaled_data[index][1]
+        else:
+            total_gains += data[index][1]
     buy_reward = np.multiply(total_gains, 1)
     sell_reward = np.multiply(total_gains, -1)
     # should punish hold reward with a decay since it's opportunity cost
