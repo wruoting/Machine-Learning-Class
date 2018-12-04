@@ -10,9 +10,10 @@ import random
 
 
 def q_learning(model=None):
-    df_data = csv_to_dataframe('sin-test.csv')
+    df_data = csv_to_dataframe('sin-real.csv')
+    model_name = 'q_model_sine.h5'
     batch_range = range(0, 15)
-    state, price_data = processing_data(df_data, batch_range)
+    state, price_data, unscaled_price_data = processing_data(df_data, batch_range)
         # Output:[[ Price Time ]]
         # State: [[ 1 2 ]]
         # Data: [[ 1 2 ]]
@@ -25,17 +26,16 @@ def q_learning(model=None):
         # 2     NaN
         # 3     NaN
 
-    stored_buffer = 1
-    epochs = 1
+    stored_buffer = np.multiply(0.75, len(price_data))
+    epochs = 20
     gamma = 0.9  # discount factor, we are rewarding long term trading with this high factor
-    learning_rate = 0.05
+    learning_rate = 0.1
     status = 1
     terminal_state = False
     batch_size = len(batch_range)
     replay = []
     state_index = 0
     loss_matrix = []
-    portfolio_exposure = 0
     if stored_buffer > len(state):
         stored_buffer = len(state)
     for epoch in range(epochs):
@@ -44,24 +44,24 @@ def q_learning(model=None):
             # Run the Q function on S and get the predicted value on Q
             q_value = model.predict(state[state_index], batch_size=batch_size)
             q_value = q_value[0][0]
-            # Prevent actions that can't be taken
-            q_value = action_rule_out(q_value, portfolio_exposure)
+            print(q_value)
             # Softmax it
             softmax_percentages = softmax(q_value, state_index, len(state))
             action = int(np.random.choice(3, 1, p=softmax_percentages))
-
             # take action and return new state
             state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range)
-
+            print(state_index)
             # observe reward
-            portfolio_exposure, reward = get_reward(portfolio_exposure, state_index, action, price_data, decision_state, batch_size)
-
+            reward = get_reward(state_index, action, price_data, decision_state, batch_size)
             # Store states if less than our buffer
             # Train on a random subset of training sets in our buffer
-            CURRENTLY IT ONLY SAMPLES FROM THE FIRST X NUMBERS!!
-            if len(replay) <= stored_buffer and not terminal_state:
+            if len(replay) < stored_buffer and not terminal_state:
                 replay.append((state, action, reward, state_index))
             else:
+                if len(replay) == stored_buffer:
+                    replay.pop(0)
+                    replay.append((state, action, reward, state_index))
+                    # we havent ended but we will replace a random one
                 batches = len(state)-1
                 mini_batch = []
                 if batches <= len(replay):
@@ -71,22 +71,14 @@ def q_learning(model=None):
                 x_train = []
                 y_train = []
                 for batch in mini_batch:
-                    print('mini batch')
                     # Get max_Q(S',a)
                     state, action, reward, new_state_index = batch
-                    print(price_data[new_state_index])
                     if new_state_index < batches:
                         old_q_val = model.predict(state[new_state_index], batch_size=batch_size)
                         new_q_val = model.predict(state[new_state_index+1], batch_size=batch_size)
-                        print(old_q_val)
-                        print(new_q_val)
-                        print(action)
                         max_q = np.max(new_q_val)
-                        print(max_q)
-                        print(reward)
                         y = old_q_val[0][0]
                         update = learning_rate * (reward + gamma * max_q - y[action])
-                        print(update)
                         y[action] += update
                     elif new_state_index == batches:
                         q_val = model.predict(state[new_state_index], batch_size=batch_size)
@@ -97,10 +89,11 @@ def q_learning(model=None):
                         x_train.append(state[new_state_index])
                         y_train.append(y.reshape(1, 1, 3))
 
-                for (x, y) in zip(x_train, y_train):
-                    model.fit(x, y, batch_size=1, epochs=1, verbose=0)
-                    loss, mse = model.evaluate(x, y, verbose=0)
-                    loss_matrix.append(loss)
+                x_train = np.squeeze(np.array(x_train), axis=1)
+                y_train = np.squeeze(np.array(y_train), axis=1)
+                model.fit(x_train, y_train, batch_size=len(mini_batch), epochs=20, verbose=0)
+                loss, mse = model.evaluate(x_train, y_train, verbose=0)
+                loss_matrix.append(loss)
             if terminal_state:  # if reached terminal state, update epoch status
                 status = 0
         # Pick a random index to start from
@@ -108,8 +101,8 @@ def q_learning(model=None):
         status = 1
         replay = []
         portfolio_exposure = 0
-    # save your model
-    model.save('q_model.h5')
+    #save your model
+    model.save(model_name)
     return loss_matrix
 
 
@@ -153,14 +146,6 @@ def softmax(q_values, state_index, total_steps):
     adjusted_q_value_softmax = np.divide([new_tolerance[0],new_tolerance[1],new_tolerance[2]], np.power(10,9))
     return adjusted_q_value_softmax
 
-def action_rule_out(q_value, portfolio_exposure):
-    # can't sell without a portfolio
-    if portfolio_exposure == 0:
-        q_value[2] = 0
-    elif portfolio_exposure == 100:
-        q_value[1] = 0
-    return q_value
-
 def take_action(action, decision_state, state, state_index, stored_buffer, batch_range, eval=False):
     terminal_state = False
     # if the current state is the last point in the frame
@@ -183,7 +168,7 @@ def take_action(action, decision_state, state, state_index, stored_buffer, batch
     return state_index, decision_state, terminal_state
 
 
-def get_reward(portfolio_exposure, state_index, action, data, decision_state, batch_size):
+def get_reward(state_index, action, data, decision_state, batch_size, eval=False):
     decision_state.fillna(value=0, inplace=True)
     time_step_length = batch_size
     current_index = state_index + time_step_length
@@ -191,53 +176,15 @@ def get_reward(portfolio_exposure, state_index, action, data, decision_state, ba
     total_gains = 0
 
     for index in range(past_index, current_index):
-        total_gains += data[index][0]
-    buy_reward = total_gains
-    hold_reward = 0
+        total_gains += data[index][1]
+    buy_reward = np.multiply(total_gains, 1)
     sell_reward = np.multiply(total_gains, -1)
+    # should punish hold reward with a decay since it's opportunity cost
+    hold_reward = np.multiply(-0.2, abs(total_gains))
 
-    # We care about whether you can buy or not because if you try to
-    # buy/sell you sometimes just can't
-    if action == 1:
-        if portfolio_exposure == 100:
-            buy_reward = 0
-        else:
-            portfolio_exposure += 10
-            buy_reward = 10 * buy_reward
-    elif action == 2:
-        if portfolio_exposure == 0:
-            sell_reward = 0
-        else:
-            portfolio_exposure -= 10
-            sell_reward = 10 * sell_reward
     action_to_reward = {
         0: hold_reward,
         1: buy_reward,
         2: sell_reward
     }
-    #print(action_to_reward)
-    return portfolio_exposure, action_to_reward[action]
-
-
-def evaluate_q_epoch(state, price_data, model, decision_state, batch_range, stored_buffer):
-    eval_reward = 0
-    terminal_state = False
-    state_index = 0
-    max_length = len(state)
-    batch_size = len(batch_range)
-    portfolio_exposure = 0
-    while not terminal_state:
-        reshaped_data = np.reshape(state[state_index],(1,1,np.multiply(len(batch_range),2)))
-
-        q_value = model.predict(reshaped_data, batch_size=batch_size)
-        q_value = q_value[0][0]
-        action = np.argmax(q_value)
-        print(q_value)
-        state_index, decision_state, terminal_state = take_action(action, decision_state, state, state_index, stored_buffer, batch_range, eval=True)
-        portfolio_exposure, action_to_reward = get_reward(portfolio_exposure, state_index, action, price_data, decision_state, batch_size)
-        eval_reward += action_to_reward
-        if state_index < max_length - 1:
-            state_index += 1
-        else:
-            terminal_state = True
-    return eval_reward, decision_state
+    return action_to_reward[action]
