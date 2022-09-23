@@ -46,7 +46,7 @@ pickleshare==0.7.5
 plotly==3.3.0
 prometheus-client==0.4.0
 prompt-toolkit==2.0.5
-protobuf==3.6.1
+protobuf==3.18.3
 Pygments==2.2.0
 pyparsing==2.2.2
 python-dateutil==2.7.3
